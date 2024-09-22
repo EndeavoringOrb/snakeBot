@@ -78,7 +78,7 @@ int main()
     uint32_t randSeed = 42;
     SnakeGame game = SnakeGame(gameSize, randSeed);
 
-    int iters = 50000;
+    int iters = 5000;
     int itersDelta = 500;
     std::cout << "Searching with " << iters << " iters" << std::endl;
 

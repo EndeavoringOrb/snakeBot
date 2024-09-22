@@ -221,7 +221,7 @@ struct SnakeGame
                     }
                     else
                     {
-                        cell.setFillColor(sf::Color(0, 170, 0)); // Darker green for the body
+                        cell.setFillColor(sf::Color(0, 125, 0)); // Darker green for the body
                     }
                 }
                 else
