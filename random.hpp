@@ -40,4 +40,25 @@ uint8_t rand256(uint32_t &seed)
     return seed & 0xFF;
 }
 
+/**
+ * Generates a random floating-point value following a normal distribution
+ *
+ * @param mean A float, the mean of the normal distribution
+ * @param std A float, the standard deviation of the normal distribution
+ * @param seed A reference to a 32-bit unsigned integer used as the seed
+ * @return A random floating-point value
+ */
+float randDist(const float mean, const float std, uint32_t &randSeed)
+{
+    // Generate two independent random numbers from a uniform distribution in the range (0,1)
+    float u1 = randFloat(randSeed);
+    float u2 = randFloat(randSeed);
+
+    // Box-Muller transform to convert uniform random numbers to normal distribution
+    float z0 = std * std::sqrt(-2.0f * std::log(u1)) * std::cos(2.0f * M_PI * u2) + mean;
+
+    // Return the generated random number
+    return z0;
+}
+
 #endif

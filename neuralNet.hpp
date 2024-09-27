@@ -2,6 +2,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <cmath>
 
 #include "random.hpp"
 
@@ -25,6 +26,28 @@ struct Matrix
     ~Matrix()
     {
         delete[] values;
+    }
+
+    void mul(const float val) {
+        for (int i = 0; i < numValues; i++)
+        {
+            values[i] *= val;
+        }
+    }
+
+    void add(const Matrix &other) {
+        for (int i = 0; i < numValues; i++)
+        {
+            values[i] += other.values[i];
+        }
+    }
+
+    void addRand(uint32_t &randSeed, const float std)
+    {
+        for (int i = 0; i < numValues; i++)
+        {
+            values[i] += randDist(0.0f, std, randSeed);
+        }
     }
 
     void zeros()
@@ -55,37 +78,39 @@ struct Matrix
             std::cout << std::endl;
         }
     }
-};
 
-// C = A @ B
-void matrixMultiply(Matrix &A, Matrix &B, Matrix &C)
-{
-    // Check if matrices are square and of the same size
-    if (A.rows != A.cols || B.rows != B.cols || C.rows != C.cols ||
-        A.rows != B.rows || A.rows != C.rows)
+    // New softmax function
+    void softmax()
     {
-        throw std::invalid_argument("All matrices must be square and of the same size");
-    }
-
-    const int ii = C.rows;
-    const int jj = C.cols;
-    const int kk = A.cols;
-
-    // Initialize C to zero
-    C.zeros();
-
-    // Perform matrix multiplication
-    for (int i = 0; i < ii; i++)
-    {
-        for (int j = 0; j < jj; j++)
+        for (int i = 0; i < rows; i++)
         {
-            for (int k = 0; k < kk; k++)
+            float max_val = values[i * cols];
+            float sum = 0.0f;
+
+            // Find max value in the row
+            for (int j = 1; j < cols; j++)
             {
-                C.values[i * jj + j] += A.values[i * kk + k] * B.values[k * jj + j];
+                if (values[i * cols + j] > max_val)
+                {
+                    max_val = values[i * cols + j];
+                }
+            }
+
+            // Compute exp and sum
+            for (int j = 0; j < cols; j++)
+            {
+                values[i * cols + j] = std::exp(values[i * cols + j] - max_val);
+                sum += values[i * cols + j];
+            }
+
+            // Normalize
+            for (int j = 0; j < cols; j++)
+            {
+                values[i * cols + j] /= sum;
             }
         }
     }
-}
+};
 
 /*
 Snake Model:
@@ -118,6 +143,25 @@ struct SnakeModel
     {
         size = _size;
         hiddenSize = _hiddenSize;
+    }
+
+    int getNumParams()
+    {
+        return weight0.numValues + weight1.numValues + weight2.numValues;
+    }
+
+    void copyWeights(SnakeModel &other)
+    {
+        weight0.copy(other.weight0);
+        weight1.copy(other.weight1);
+        weight2.copy(other.weight2);
+    }
+
+    void addRand(uint32_t &randSeed, const float std)
+    {
+        weight0.addRand(randSeed, std);
+        weight1.addRand(randSeed, std);
+        weight2.addRand(randSeed, std);
     }
 
     void forward(const uint8_t *board, const int applePos, Matrix &out)

@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-#include "random.hpp"
+#include "neuralNet.hpp"
 
 enum SnakeDirections
 {
