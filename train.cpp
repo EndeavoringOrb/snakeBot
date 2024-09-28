@@ -97,7 +97,8 @@ float testModel(const SnakeGame &game, SnakeModel &model, Matrix &out, uint32_t 
         }
 
         // Accumulate score (apples per step)
-        totalScore += (float)newGame.score / (float)numSteps;
+        // totalScore += (float)newGame.score / (float)numSteps;
+        totalScore += newGame.score;
     }
 
     return totalScore / (float)iters;
@@ -113,13 +114,14 @@ int main()
     SnakeGame game = SnakeGame(gameSize, randSeed);
 
     // Init neural network stuff
-    int nTrials = 10000;
-    int itersPerTrial = 100;
-    float sigma = 0.01f;
+    int nTrials = 250;
+    int itersPerTrial = 5000;
+    float sigma = 1e-5f;
     float learningRate = 0.01f;
-    int appleTolerance = 300;
+    int appleTolerance = 150;
     const int hiddenSize = 4;
 
+    std::string savePath = "model.bin";
     SnakeModel model = SnakeModel(gameSize, hiddenSize);
     SnakeModel modelCopy = SnakeModel(gameSize, hiddenSize);
     Matrix weight0Grad = Matrix(gameSize * gameSize, hiddenSize);
@@ -129,7 +131,7 @@ int main()
 
     // Init tracker stuff
     int stepNum = 0;
-    int logInterval = 100;
+    int logInterval = 1;
 
     std::cout << "Model has " << model.getNumParams() << " parameters" << std::endl;
 
@@ -154,6 +156,7 @@ int main()
 
             modelCopy.copyWeights(model);
             // Add random noise to copy of model using sigma
+            uint32_t noiseSeed = randSeed;
             modelCopy.addRand(randSeed, sigma);
 
             // Test model
@@ -161,6 +164,7 @@ int main()
             totalScore += score;
 
             // Update gradient
+            modelCopy.setRand(noiseSeed, sigma); // Get just the noise, not weights + noise
             modelCopy.weight0.mul(score);
             modelCopy.weight1.mul(score);
             modelCopy.weight2.mul(score);
@@ -184,6 +188,8 @@ int main()
         model.weight2.add(weight2Grad);
 
         stepNum++;
+
+        model.saveToFile(savePath);
     }
 
     return 0;

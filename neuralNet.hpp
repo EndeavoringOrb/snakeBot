@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <iostream>
 #include <cmath>
+#include <fstream>
 
 #include "random.hpp"
 
@@ -28,17 +29,27 @@ struct Matrix
         delete[] values;
     }
 
-    void mul(const float val) {
+    void mul(const float val)
+    {
         for (int i = 0; i < numValues; i++)
         {
             values[i] *= val;
         }
     }
 
-    void add(const Matrix &other) {
+    void add(const Matrix &other)
+    {
         for (int i = 0; i < numValues; i++)
         {
             values[i] += other.values[i];
+        }
+    }
+
+    void sub(const Matrix &other)
+    {
+        for (int i = 0; i < numValues; i++)
+        {
+            values[i] -= other.values[i];
         }
     }
 
@@ -47,6 +58,14 @@ struct Matrix
         for (int i = 0; i < numValues; i++)
         {
             values[i] += randDist(0.0f, std, randSeed);
+        }
+    }
+
+    void setRand(uint32_t &randSeed, const float std)
+    {
+        for (int i = 0; i < numValues; i++)
+        {
+            values[i] = randDist(0.0f, std, randSeed);
         }
     }
 
@@ -162,6 +181,60 @@ struct SnakeModel
         weight0.addRand(randSeed, std);
         weight1.addRand(randSeed, std);
         weight2.addRand(randSeed, std);
+    }
+
+    void setRand(uint32_t &randSeed, const float std)
+    {
+        weight0.setRand(randSeed, std);
+        weight1.setRand(randSeed, std);
+        weight2.setRand(randSeed, std);
+    }
+
+    // Serialize the model to a binary file
+    bool saveToFile(const std::string &filename) const
+    {
+        std::ofstream file(filename, std::ios::binary);
+        if (!file.is_open())
+        {
+            std::cerr << "Error: Unable to open file for writing: " << filename << std::endl;
+            return false;
+        }
+
+        // Write size and hiddenSize
+        file.write(reinterpret_cast<const char *>(&size), sizeof(int));
+        file.write(reinterpret_cast<const char *>(&hiddenSize), sizeof(int));
+
+        // Write weight matrices
+        file.write(reinterpret_cast<const char *>(weight0.values), weight0.numValues * sizeof(float));
+        file.write(reinterpret_cast<const char *>(weight1.values), weight1.numValues * sizeof(float));
+        file.write(reinterpret_cast<const char *>(weight2.values), weight2.numValues * sizeof(float));
+
+        file.close();
+        return true;
+    }
+
+    // Deserialize the model from a binary file
+    static SnakeModel loadFromFile(const std::string &filename)
+    {
+        std::ifstream file(filename, std::ios::binary);
+        if (!file.is_open())
+        {
+            throw std::runtime_error("Error: Unable to open file for reading: " + filename);
+        }
+
+        int loadedSize, loadedHiddenSize;
+        file.read(reinterpret_cast<char *>(&loadedSize), sizeof(int));
+        file.read(reinterpret_cast<char *>(&loadedHiddenSize), sizeof(int));
+
+        SnakeModel loadedModel(loadedSize, loadedHiddenSize);
+
+        // Read weight matrices
+        file.read(reinterpret_cast<char *>(loadedModel.weight0.values), loadedModel.weight0.numValues * sizeof(float));
+        file.read(reinterpret_cast<char *>(loadedModel.weight1.values), loadedModel.weight1.numValues * sizeof(float));
+        file.read(reinterpret_cast<char *>(loadedModel.weight2.values), loadedModel.weight2.numValues * sizeof(float));
+
+        file.close();
+        return loadedModel;
     }
 
     void forward(const uint8_t *board, const int applePos, Matrix &out)
