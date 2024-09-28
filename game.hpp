@@ -30,7 +30,7 @@ SnakeActions randAction(uint32_t &randSeed)
 SnakeActions sampleAction(Matrix &out, uint32_t &randSeed)
 {
     out.softmax();
-    //out.print("probs");
+    // out.print("probs");
     const float val = randFloat(randSeed);
     if (val < out.values[0])
     {
@@ -231,17 +231,15 @@ struct SnakeGame
                 cell.setPosition(offsetX + j * cellSize, offsetY + i * cellSize);
 
                 const int index = i * size + j;
-                if (board[index] > 0)
+                if (index == applePosition)
+                {
+                    // Draw apple
+                    cell.setFillColor(sf::Color::Red);
+                }
+                else if (board[index] > 0)
                 {
                     // Draw snake
-                    if (index == snakeHeadPosition)
-                    {
-                        cell.setFillColor(sf::Color::Green);
-                    }
-                    else
-                    {
-                        cell.setFillColor(sf::Color(0, 255.0f * (float)board[index] / (float)board[snakeHeadPosition], 0)); // Darker green for the body
-                    }
+                    cell.setFillColor(sf::Color(0, 255.0f * (float)board[index] / (float)board[snakeHeadPosition], 0));
                 }
                 else
                 {
