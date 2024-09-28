@@ -101,32 +101,24 @@ struct Matrix
     // New softmax function
     void softmax()
     {
-        for (int i = 0; i < rows; i++)
+        float maxVal = values[0];
+
+        for (int i = 0; i < numValues; i++)
         {
-            float max_val = values[i * cols];
-            float sum = 0.0f;
+            maxVal = std::max(maxVal, values[i]);
+        }
 
-            // Find max value in the row
-            for (int j = 1; j < cols; j++)
-            {
-                if (values[i * cols + j] > max_val)
-                {
-                    max_val = values[i * cols + j];
-                }
-            }
+        float sum = 0.0f;
+        for (int i = 0; i < numValues; i++)
+        {
+            values[i] = std::exp(values[i] - maxVal);
+            sum += values[i];
+        }
 
-            // Compute exp and sum
-            for (int j = 0; j < cols; j++)
-            {
-                values[i * cols + j] = std::exp(values[i * cols + j] - max_val);
-                sum += values[i * cols + j];
-            }
-
-            // Normalize
-            for (int j = 0; j < cols; j++)
-            {
-                values[i * cols + j] /= sum;
-            }
+        // Normalize
+        for (int i = 0; i < numValues; i++)
+        {
+            values[i] /= sum;
         }
     }
 };
@@ -248,6 +240,7 @@ struct SnakeModel
                 hidden.values[j] += board[i] * weight0.values[i * hiddenSize + j];
             }
         }
+        //hidden.print("hidden");
 
         // hidden = activation(hidden + weight1[applePos])
         for (int j = 0; j < hiddenSize; j++)
@@ -264,18 +257,22 @@ struct SnakeModel
             }
             else
             {
-                hidden.values[j] = 2.0f * x / (x * x + 1.0f);
+                hidden.values[j] = (x + x) / (x * x + 1.0f);
             }
         }
 
+        //hidden.print("hidden");
+
         // out = hidden @ weight2
+        out.zeros();
         for (int i = 0; i < hiddenSize; i++)
         {
-            for (int j = 0; j < 3; j++)
-            {
-                out.values[j] += hidden.values[i] * weight2.values[i * hiddenSize + j];
-            }
+            out.values[0] += hidden.values[i] * weight2.values[i * hiddenSize + 0];
+            out.values[1] += hidden.values[i] * weight2.values[i * hiddenSize + 1];
+            out.values[2] += hidden.values[i] * weight2.values[i * hiddenSize + 2];
         }
+
+        //out.print("out");
     }
 };
 

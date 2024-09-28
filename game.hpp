@@ -27,6 +27,22 @@ SnakeActions randAction(uint32_t &randSeed)
     return (SnakeActions)std::min(2, (int)(3.0f * randVal));
 }
 
+SnakeActions sampleAction(Matrix &out, uint32_t &randSeed)
+{
+    out.softmax();
+    //out.print("probs");
+    const float val = randFloat(randSeed);
+    if (val < out.values[0])
+    {
+        return SnakeActions::TURN_LEFT;
+    }
+    if (val < out.values[0] + out.values[1])
+    {
+        return SnakeActions::TURN_RIGHT;
+    }
+    return SnakeActions::NO_TURN;
+};
+
 struct SnakeGame
 {
     uint8_t *board;
@@ -58,10 +74,9 @@ struct SnakeGame
         }
 
         // Reset snake
-        snakeHeadPosition = 135;
-        board[135] = 3;
-        board[134] = 2;
-        board[133] = 1;
+        snakeHeadPosition = (size / 2) * size + size / 2;
+        board[snakeHeadPosition] = 2;
+        board[snakeHeadPosition - 1] = 1;
         snakeDirection = SnakeDirections::RIGHT;
 
         // Reset score
@@ -73,10 +88,10 @@ struct SnakeGame
 
     void randomizeApplePosition(uint32_t &randSeed)
     {
-        applePosition = rand256(randSeed);
+        applePosition = randInt(randSeed, size * size);
         while (board[applePosition] > 0)
         {
-            applePosition = rand256(randSeed);
+            applePosition = randInt(randSeed, size * size);
         }
     }
 
@@ -133,8 +148,17 @@ struct SnakeGame
         // Apple collision
         if (snakeHeadPosition == applePosition)
         {
-            // Increase score, and increase length of snake
+            // Increase score
             score++;
+
+            // Got max score
+            if (score + 2 == size * size)
+            {
+                return true;
+            }
+
+            // Update board with new head pos
+            board[snakeHeadPosition] = score + 2; // +2 because we start with a length of 2
             randomizeApplePosition(randSeed);
         }
         else
@@ -149,10 +173,10 @@ struct SnakeGame
                     (*boardptr)--;
                 }
             }
-        }
 
-        // Add new head position
-        board[snakeHeadPosition] = score + 3; // +3 because we start with a length of 3
+            // Update board with new head pos
+            board[snakeHeadPosition] = score + 2; // +2 because we start with a length of 2
+        }
 
         return false;
     }
@@ -221,7 +245,7 @@ struct SnakeGame
                     }
                     else
                     {
-                        cell.setFillColor(sf::Color(0, 125, 0)); // Darker green for the body
+                        cell.setFillColor(sf::Color(0, 255.0f * (float)board[index] / (float)board[snakeHeadPosition], 0)); // Darker green for the body
                     }
                 }
                 else

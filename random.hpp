@@ -40,6 +40,12 @@ uint8_t rand256(uint32_t &seed)
     return seed & 0xFF;
 }
 
+uint32_t randInt(uint32_t &seed, const uint32_t high)
+{
+    const float randVal = randFloat(seed);
+    return std::min(high - 1, (uint32_t)(randVal * high));
+}
+
 /**
  * Generates a random floating-point value following a normal distribution
  *

@@ -1,72 +1,12 @@
 #include "game.hpp"
 #include "customUtils.hpp"
 
-std::vector<float> getScores(const SnakeGame &game, uint32_t &randSeed, const int iters)
-{
-    // Counters for scores gotten
-    int turnLeftScore = 0;
-    int turnRightScore = 0;
-    int noTurnScore = 0;
-
-    // Copy of game for test runs
-    SnakeGame newGame = SnakeGame(game.size, randSeed);
-
-    for (int i = 0; i < iters; i++)
-    {
-        // Play left turn
-        newGame.copyState(game);
-        bool gameOver = newGame.step(SnakeActions::TURN_LEFT, randSeed);
-        while (!gameOver)
-        {
-            gameOver = newGame.step(randAction(randSeed), randSeed);
-        }
-        turnLeftScore += newGame.score;
-
-        // Play right turn
-        newGame.copyState(game);
-        gameOver = newGame.step(SnakeActions::TURN_RIGHT, randSeed);
-        while (!gameOver)
-        {
-            gameOver = newGame.step(randAction(randSeed), randSeed);
-        }
-        turnRightScore += newGame.score;
-
-        // Play no turn
-        newGame.copyState(game);
-        gameOver = newGame.step(SnakeActions::NO_TURN, randSeed);
-        while (!gameOver)
-        {
-            gameOver = newGame.step(randAction(randSeed), randSeed);
-        }
-        noTurnScore += newGame.score;
-    }
-
-    std::vector<float> scores = {(float)turnLeftScore / (float)iters,
-                                 (float)turnRightScore / (float)iters,
-                                 (float)noTurnScore / (float)iters};
-    return scores;
-}
-
-SnakeActions sampleAction(Matrix &out, uint32_t &randSeed)
-{
-    out.softmax();
-    const float val = randFloat(randSeed);
-    if (val < out.values[0])
-    {
-        return SnakeActions::TURN_LEFT;
-    }
-    if (val < out.values[0] + out.values[1])
-    {
-        return SnakeActions::TURN_RIGHT;
-    }
-    return SnakeActions::NO_TURN;
-};
-
 float testModel(const SnakeGame &game, SnakeModel &model, Matrix &out, uint32_t &randSeed, const int iters, const int appleTolerance)
 {
     // Copy of game for test runs
     SnakeGame newGame = SnakeGame(game.size, randSeed);
     float totalScore = 0.0f;
+    float maxScore = 0.0f;
 
     for (int i = 0; i < iters; i++)
     {
@@ -98,28 +38,29 @@ float testModel(const SnakeGame &game, SnakeModel &model, Matrix &out, uint32_t 
 
         // Accumulate score (apples per step)
         // totalScore += (float)newGame.score / (float)numSteps;
-        totalScore += newGame.score;
+        maxScore = std::max(maxScore, (float)newGame.score);
+        // totalScore += newGame.score;
     }
 
-    return totalScore / (float)iters;
+    return maxScore; // totalScore / (float)iters;
 }
 
 int main()
 {
     // Init game stuff
-    constexpr int gameSize = 16;
-    float tickSpeed = 0.00f;
+    constexpr int gameSize = 4;
     sf::Clock gameClock;
+    uint32_t gameRandSeed = 42;
     uint32_t randSeed = 42;
-    SnakeGame game = SnakeGame(gameSize, randSeed);
+    SnakeGame game = SnakeGame(gameSize, gameRandSeed);
 
     // Init neural network stuff
-    int nTrials = 250;
-    int itersPerTrial = 5000;
-    float sigma = 1e-5f;
-    float learningRate = 0.01f;
-    int appleTolerance = 150;
-    const int hiddenSize = 4;
+    constexpr int nTrials = 1000;
+    constexpr int itersPerTrial = 10000;
+    float sigma = 1e-2f;
+    float learningRate = 1e-4f;
+    int appleTolerance = 300;
+    const int hiddenSize = 16;
 
     std::string savePath = "model.bin";
     SnakeModel model = SnakeModel(gameSize, hiddenSize);
@@ -129,9 +70,11 @@ int main()
     Matrix weight2Grad = Matrix(hiddenSize, 3);
     Matrix out = Matrix(1, 3);
 
+    float *scores = new float[nTrials];
+
     // Init tracker stuff
     int stepNum = 0;
-    int logInterval = 1;
+    int logInterval = 10;
 
     std::cout << "Model has " << model.getNumParams() << " parameters" << std::endl;
 
@@ -142,8 +85,8 @@ int main()
         weight1Grad.zeros();
         weight2Grad.zeros();
 
-        // Init trackers
-        float totalScore = 0.0f;
+        float meanScore = 0.0f;
+        uint32_t noiseSeed = randSeed;
 
         std::cout << std::endl;
         for (int i = 0; i < nTrials; i++)
@@ -156,25 +99,41 @@ int main()
 
             modelCopy.copyWeights(model);
             // Add random noise to copy of model using sigma
-            uint32_t noiseSeed = randSeed;
+
             modelCopy.addRand(randSeed, sigma);
 
             // Test model
-            const float score = testModel(game, modelCopy, out, randSeed, itersPerTrial, appleTolerance);
-            totalScore += score;
+            const float score = testModel(game, modelCopy, out, gameRandSeed, itersPerTrial, appleTolerance);
+            scores[i] = score;
+            meanScore += score;
+        }
 
-            // Update gradient
+        // Get mean and std
+        meanScore /= (float)nTrials;
+        float std = 0.0f;
+        for (int i = 0; i < nTrials; i++)
+        {
+            const float x = scores[i] - meanScore;
+            std += x * x;
+        }
+        std = sqrt(std / (float)nTrials);
+        const float invStd = 1.0f / std;
+
+        clearLines(1);
+        std::cout << "Step " << stepNum << ", Avg. Score: " << meanScore << std::endl;
+
+        // Normalize scores and update gradient
+        for (int i = 0; i < nTrials; i++)
+        {
+            const float scoreVal = (scores[i] - meanScore) * invStd;
             modelCopy.setRand(noiseSeed, sigma); // Get just the noise, not weights + noise
-            modelCopy.weight0.mul(score);
-            modelCopy.weight1.mul(score);
-            modelCopy.weight2.mul(score);
+            modelCopy.weight0.mul(scoreVal);
+            modelCopy.weight1.mul(scoreVal);
+            modelCopy.weight2.mul(scoreVal);
             weight0Grad.add(modelCopy.weight0);
             weight1Grad.add(modelCopy.weight1);
             weight2Grad.add(modelCopy.weight2);
         }
-
-        clearLines(1);
-        std::cout << "Step " << stepNum << ", Avg. Score: " << totalScore / nTrials << std::endl;
 
         // Finalize gradient
         float mulVal = learningRate / (nTrials * sigma);

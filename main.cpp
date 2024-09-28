@@ -21,34 +21,55 @@ std::vector<float> getScores(const SnakeGame &game, uint32_t &randSeed, const in
         // Play left turn
         newGame.copyState(game);
         bool gameOver = newGame.step(SnakeActions::TURN_LEFT, randSeed);
-        while (!gameOver)
+        if (!gameOver)
         {
-            gameOver = newGame.step(randAction(randSeed), randSeed);
+            for (int j = 0; j < game.size * game.size; j++)
+            {
+                gameOver = newGame.step(randAction(randSeed), randSeed);
+                if (gameOver)
+                {
+                    break;
+                }
+            }
         }
-        turnLeftScore += newGame.score;
+        turnLeftScore = std::max(turnLeftScore, newGame.score);
 
         // Play right turn
         newGame.copyState(game);
         gameOver = newGame.step(SnakeActions::TURN_RIGHT, randSeed);
-        while (!gameOver)
+        if (!gameOver)
         {
-            gameOver = newGame.step(randAction(randSeed), randSeed);
+            for (int j = 0; j < game.size * game.size; j++)
+            {
+                gameOver = newGame.step(randAction(randSeed), randSeed);
+                if (gameOver)
+                {
+                    break;
+                }
+            }
         }
-        turnRightScore += newGame.score;
+        turnRightScore = std::max(turnRightScore, newGame.score);
 
         // Play no turn
         newGame.copyState(game);
         gameOver = newGame.step(SnakeActions::NO_TURN, randSeed);
-        while (!gameOver)
+        if (!gameOver)
         {
-            gameOver = newGame.step(randAction(randSeed), randSeed);
+            for (int j = 0; j < game.size * game.size; j++)
+            {
+                gameOver = newGame.step(randAction(randSeed), randSeed);
+                if (gameOver)
+                {
+                    break;
+                }
+            }
         }
-        noTurnScore += newGame.score;
+        noTurnScore = std::max(noTurnScore, newGame.score);
     }
 
-    std::vector<float> scores = {(float)turnLeftScore / (float)iters,
-                                 (float)turnRightScore / (float)iters,
-                                 (float)noTurnScore / (float)iters};
+    std::vector<float> scores = {(float)turnLeftScore,
+                                 (float)turnRightScore,
+                                 (float)noTurnScore};
     return scores;
 }
 
@@ -72,13 +93,13 @@ int main()
     infoText.setPosition(10, 10);
 
     // Init game
-    constexpr int gameSize = 16;
-    float tickSpeed = 0.00f;
+    constexpr int gameSize = 4;
+    float tickSpeed = 0.2f;
     sf::Clock gameClock;
     uint32_t randSeed = 42;
     SnakeGame game = SnakeGame(gameSize, randSeed);
 
-    int iters = 5000;
+    int iters = 50000;
     int itersDelta = 500;
     std::cout << "Searching with " << iters << " iters" << std::endl;
 
@@ -89,38 +110,46 @@ int main()
         {
             if (event.type == sf::Event::Closed)
                 window.close();
-            if (event.type == sf::Event::KeyPressed) {
-                if (event.key.code == sf::Keyboard::Equal || event.key.code == sf::Keyboard::Add) {
+            if (event.type == sf::Event::KeyPressed)
+            {
+                if (event.key.code == sf::Keyboard::Equal || event.key.code == sf::Keyboard::Add)
+                {
                     iters += itersDelta;
                     std::cout << "Searching with " << iters << " iters" << std::endl;
                 }
-                else if (event.key.code == sf::Keyboard::Hyphen || event.key.code == sf::Keyboard::Subtract) {
+                else if (event.key.code == sf::Keyboard::Hyphen || event.key.code == sf::Keyboard::Subtract)
+                {
                     iters -= itersDelta;
                     std::cout << "Searching with " << iters << " iters" << std::endl;
                 }
             }
         }
 
-        // Update game
-        std::vector<float> scores = getScores(game, randSeed, iters);
-        SnakeActions currentAction;
-        if (scores[0] > scores[1] && scores[0] > scores[2])
+        if (gameClock.getElapsedTime().asSeconds() > tickSpeed)
         {
-            currentAction = SnakeActions::TURN_LEFT;
-        }
-        else if (scores[1] > scores[0] && scores[1] > scores[2])
-        {
-            currentAction = SnakeActions::TURN_RIGHT;
-        }
-        else
-        {
-            currentAction = SnakeActions::NO_TURN;
-        }
+            // Update game
+            std::vector<float> scores = getScores(game, randSeed, iters);
+            SnakeActions currentAction;
+            if (scores[0] > scores[1] && scores[0] > scores[2])
+            {
+                currentAction = SnakeActions::TURN_LEFT;
+            }
+            else if (scores[1] > scores[0] && scores[1] > scores[2])
+            {
+                currentAction = SnakeActions::TURN_RIGHT;
+            }
+            else
+            {
+                currentAction = SnakeActions::NO_TURN;
+            }
 
-        bool gameOver = game.step(currentAction, randSeed);
-        if (gameOver)
-        {
-            game.reset(randSeed);
+            bool gameOver = game.step(currentAction, randSeed);
+            if (gameOver)
+            {
+                game.reset(randSeed);
+            }
+
+            gameClock.restart();
         }
 
         // Update info text
