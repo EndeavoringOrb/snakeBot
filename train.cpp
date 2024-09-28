@@ -31,18 +31,18 @@ float testModel(const SnakeGame &game, SnakeModel &model, Matrix &out, uint32_t 
             }
             else if (numSteps - lastAppleStep > appleTolerance)
             {
-                gameOver = true;
+                gameOver = true; // Have gone appleTolerance steps without getting an apple, so stop
             }
             numSteps++;
         }
 
         // Accumulate score (apples per step)
         // totalScore += (float)newGame.score / (float)numSteps;
-        maxScore = std::max(maxScore, (float)newGame.score);
-        // totalScore += newGame.score;
+        // maxScore = std::max(maxScore, (float)newGame.score);
+        totalScore += newGame.score;
     }
 
-    return maxScore; // totalScore / (float)iters;
+    return totalScore / (float)iters;
 }
 
 int main()
@@ -58,8 +58,8 @@ int main()
     constexpr int nTrials = 1000;
     constexpr int itersPerTrial = 10000;
     float sigma = 1e-2f;
-    float learningRate = 1e-4f;
-    int appleTolerance = 300;
+    float learningRate = 1e-3f;
+    int appleTolerance = gameSize * gameSize;
     const int hiddenSize = 16;
 
     std::string savePath = "model.bin";

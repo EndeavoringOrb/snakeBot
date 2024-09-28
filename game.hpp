@@ -215,7 +215,7 @@ struct SnakeGame
 
     void render(sf::RenderWindow &window, sf::Text &renderText)
     {
-        const float cellSize = std::min(window.getSize().x / size, window.getSize().y / size);
+        const float cellSize = std::min((float)window.getSize().x / (float)size, (float)window.getSize().y / (float)size);
         const float offsetX = (window.getSize().x - cellSize * size) / 2;
         const float offsetY = (window.getSize().y - cellSize * size) / 2;
 
@@ -231,12 +231,7 @@ struct SnakeGame
                 cell.setPosition(offsetX + j * cellSize, offsetY + i * cellSize);
 
                 const int index = i * size + j;
-                if (index == applePosition)
-                {
-                    // Draw apple
-                    cell.setFillColor(sf::Color::Red);
-                }
-                else if (board[index] > 0)
+                if (board[index] > 0)
                 {
                     // Draw snake
                     if (index == snakeHeadPosition)

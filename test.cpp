@@ -37,6 +37,13 @@ int main()
         {
             if (event.type == sf::Event::Closed)
                 window.close();
+            if (event.type == sf::Event::Resized)
+            {
+                sf::View view = window.getView();
+                view.setSize(event.size.width, event.size.height);
+                view.setCenter((float)event.size.width / 2.0f, (float)event.size.height / 2.0f);
+                window.setView(view);
+            }
         }
 
         if (gameClock.getElapsedTime().asSeconds() > tickSpeed)
