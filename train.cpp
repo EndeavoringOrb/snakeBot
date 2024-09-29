@@ -56,11 +56,11 @@ int main()
 
     // Init neural network stuff
     constexpr int nTrials = 1000;
-    constexpr int itersPerTrial = 10000;
-    float sigma = 1e-2f;
+    constexpr int itersPerTrial = 1;
+    float sigma = 1e-1f;
     float learningRate = 1e-3f;
     int appleTolerance = gameSize * gameSize;
-    const int hiddenSize = 16;
+    const int hiddenSize = 32;
 
     std::string savePath = "model.bin";
     SnakeModel model = SnakeModel(gameSize, hiddenSize);
@@ -68,13 +68,16 @@ int main()
     Matrix weight0Grad = Matrix(gameSize * gameSize, hiddenSize);
     Matrix weight1Grad = Matrix(gameSize * gameSize, hiddenSize);
     Matrix weight2Grad = Matrix(hiddenSize, 3);
+    AdamOptimizer optim0 = AdamOptimizer(weight0Grad.numValues, learningRate);
+    AdamOptimizer optim1 = AdamOptimizer(weight1Grad.numValues, learningRate);
+    AdamOptimizer optim2 = AdamOptimizer(weight2Grad.numValues, learningRate);
     Matrix out = Matrix(1, 3);
 
     float *scores = new float[nTrials];
 
     // Init tracker stuff
     int stepNum = 0;
-    int logInterval = 10;
+    int logInterval = 1000;
 
     std::cout << "Model has " << model.getNumParams() << " parameters" << std::endl;
 
@@ -136,10 +139,15 @@ int main()
         }
 
         // Finalize gradient
-        float mulVal = learningRate / (nTrials * sigma);
+        float mulVal = 1.0f / (nTrials * sigma);
         weight0Grad.mul(mulVal);
         weight1Grad.mul(mulVal);
         weight2Grad.mul(mulVal);
+
+        // Adam
+        optim0.getGrads(weight0Grad);
+        optim1.getGrads(weight1Grad);
+        optim2.getGrads(weight2Grad);
 
         // Update model using gradient
         model.weight0.add(weight0Grad);

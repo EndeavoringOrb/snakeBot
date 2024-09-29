@@ -22,6 +22,10 @@ int main()
 
     // Load model
     SnakeModel model = SnakeModel(1, 1).loadFromFile("model.bin");
+    std::cout << "Loaded model" << std::endl;
+    model.weight0.print("weight0");
+    model.weight1.print("weight1");
+    model.weight2.print("weight2");
     Matrix out = Matrix(1, 3);
 
     // Init game
@@ -50,6 +54,7 @@ int main()
         {
             // Model forward
             model.forward(game.board, game.applePosition, out);
+            out.print("out");
 
             // Update game
             bool gameOver = game.step(sampleAction(out, randSeed), randSeed);

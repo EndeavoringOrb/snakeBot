@@ -14,6 +14,8 @@ struct Matrix
     int numValues = 0;
     float *values;
 
+    Matrix() {}
+
     Matrix(int _rows, int _cols)
     {
         rows = _rows;
@@ -240,7 +242,7 @@ struct SnakeModel
                 hidden.values[j] += board[i] * weight0.values[i * hiddenSize + j];
             }
         }
-        //hidden.print("hidden");
+        // hidden.print("hidden");
 
         // hidden = activation(hidden + weight1[applePos])
         for (int j = 0; j < hiddenSize; j++)
@@ -261,18 +263,74 @@ struct SnakeModel
             }
         }
 
-        //hidden.print("hidden");
+        // hidden.print("hidden");
 
         // out = hidden @ weight2
         out.zeros();
         for (int i = 0; i < hiddenSize; i++)
         {
-            out.values[0] += hidden.values[i] * weight2.values[i * hiddenSize + 0];
-            out.values[1] += hidden.values[i] * weight2.values[i * hiddenSize + 1];
-            out.values[2] += hidden.values[i] * weight2.values[i * hiddenSize + 2];
+            out.values[0] += hidden.values[i] * weight2.values[i * 3 + 0];
+            out.values[1] += hidden.values[i] * weight2.values[i * 3 + 1];
+            out.values[2] += hidden.values[i] * weight2.values[i * 3 + 2];
         }
 
-        //out.print("out");
+        // out.print("out");
+    }
+};
+
+struct AdamOptimizer
+{
+    int nParams;
+    Matrix m;
+    Matrix v;
+    float alpha;      // the learning rate. good default value: 1e-2
+    float beta1;      // good default value: 0.9
+    float beta1Power; // used instead of calculating a std::pow every iteration
+    float beta2;      // good default value: 0.999
+    float beta2Power; // used instead of calculating a std::pow every iteration
+    int t = 0;
+    float eps;
+
+    AdamOptimizer(int _nParams, float _alpha, float _beta1 = 0.9f, float _beta2 = 0.999f, float _eps = 1e-5f)
+        : m(1, _nParams),
+          v(1, _nParams)
+    {
+        nParams = _nParams;
+        alpha = _alpha;
+        beta1 = _beta1;
+        beta2 = _beta2;
+        beta1Power = beta1;
+        beta2Power = beta2;
+        eps = _eps;
+    }
+
+    void getGrads(Matrix &grad)
+    {
+        // Compute constants
+        const float beta1Minus = 1.0f - beta1;
+        const float beta2Minus = 1.0f - beta2;
+        const float mHatMul = 1.0f / (1.0f - beta1Power);
+        const float vHatMul = 1.0f / (1.0f - beta2Power);
+        for (int i = 0; i < nParams; i++)
+        {
+            // Compute m and mHat
+            const float mVal = beta1 * m.values[i] + beta1Minus * grad.values[i];
+            m.values[i] = mVal;
+            const float mHatVal = mVal * mHatMul;
+
+            // Compute v and vHat
+            const float vVal = beta2 * v.values[i] + beta2Minus * grad.values[i] * grad.values[i];
+            v.values[i] = vVal;
+            const float vHatVal = vVal * vHatMul;
+
+            // Compute new grad
+            grad.values[i] = alpha * mHatVal / (sqrtf(vHatVal) + eps);
+        }
+
+        // Increase values
+        beta1Power *= beta1;
+        beta2Power *= beta2;
+        t++;
     }
 };
 
