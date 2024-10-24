@@ -123,6 +123,27 @@ struct Matrix
             values[i] /= sum;
         }
     }
+
+    float normSquared()
+    {
+        float val = 0.0f;
+        for (int i = 0; i < numValues; i++)
+        {
+            val += values[i] * values[i];
+        }
+        return val;
+    }
+
+    float diffSquared(Matrix &other)
+    {
+        float val = 0.0f;
+        for (int i = 0; i < numValues; i++)
+        {
+            float diff = values[i] - other.values[i];
+            val += diff * diff;
+        }
+        return val;
+    }
 };
 
 /*

@@ -21,7 +21,10 @@ int main()
     infoText.setPosition(10, 10);
 
     // Load model
-    SnakeModel model = SnakeModel(1, 1).loadFromFile("model.bin");
+    int trainingRun;
+    std::cout << "Enter training run #: ";
+    std::cin >> trainingRun;
+    SnakeModel model = SnakeModel(1, 1).loadFromFile("trainingRuns/" + std::to_string(trainingRun) + "/model.bin");
     std::cout << "Loaded model" << std::endl;
     model.weight0.print("weight0");
     model.weight1.print("weight1");

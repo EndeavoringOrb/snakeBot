@@ -1,5 +1,54 @@
 #include "game.hpp"
 #include "customUtils.hpp"
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+int getNextTrainingRun(const std::string &directory)
+{
+    std::vector<int> runNumbers;
+
+    try
+    {
+        // Check if directory exists
+        if (!fs::exists(directory))
+        {
+            std::cout << "Directory doesn't exist, creating it..." << std::endl;
+            fs::create_directory(directory);
+            return 1; // First run
+        }
+
+        // Iterate through directory entries
+        for (const auto &entry : fs::directory_iterator(directory))
+        {
+            try
+            {
+                // Convert directory name to integer
+                int runNumber = std::stoi(entry.path().filename().string());
+                runNumbers.push_back(runNumber);
+            }
+            catch (const std::invalid_argument &)
+            {
+                // Skip entries that can't be converted to integer
+                continue;
+            }
+        }
+
+        // If no valid numbered directories found
+        if (runNumbers.empty())
+        {
+            return 0; // First run
+        }
+
+        // Find maximum number and add 1
+        return *std::max_element(runNumbers.begin(), runNumbers.end()) + 1;
+    }
+    catch (const fs::filesystem_error &e)
+    {
+        std::cerr << "Filesystem error: " << e.what() << std::endl;
+        throw;
+    }
+}
 
 float testModel(const SnakeGame &game, SnakeModel &model, Matrix &out, uint32_t &randSeed, const int iters, const int appleTolerance)
 {
@@ -47,23 +96,57 @@ float testModel(const SnakeGame &game, SnakeModel &model, Matrix &out, uint32_t 
 
 int main()
 {
+    // Settings
+    constexpr int gameSize = 16;
+
+    constexpr int nTrials = 30;
+    constexpr int itersPerTrial = 10000;
+    float sigma = 1e-3f;
+    float learningRate = 1e-2f;
+    int appleTolerance = gameSize * gameSize;
+    const int hiddenSize = 32;
+
+    // Get training run ID
+    int currentTrainingRun = getNextTrainingRun("trainingRuns");
+    std::string currentTrainingRunPath = "trainingRuns/" + std::to_string(currentTrainingRun);
+
+    // Create directory for training run
+    if (fs::create_directories(currentTrainingRunPath))
+    {
+        std::cout << "Directory created successfully: " << currentTrainingRunPath << std::endl;
+    }
+    else
+    {
+        std::cerr << "Failed to create directory: " << currentTrainingRunPath << std::endl;
+    }
+
+    // Save config
+    std::ofstream file(currentTrainingRunPath + "/config.txt", std::ios::out); // Open in append mode
+    if (file.is_open())
+    {
+        file << "gameSize: " << gameSize << "\n";
+        file << "nTrials: " << nTrials << "\n";
+        file << "itersPerTrial: " << itersPerTrial << "\n";
+        file << "sigma: " << sigma << "\n";
+        file << "learningRate: " << learningRate << "\n";
+        file << "appleTolerance: " << appleTolerance << "\n";
+        file << "hiddenSize: " << hiddenSize << "\n";
+        file.close();
+    }
+
+    std::cout << "Initializing game" << std::endl;
     // Init game stuff
-    constexpr int gameSize = 4;
     sf::Clock gameClock;
     uint32_t gameRandSeed = 42;
     uint32_t randSeed = 42;
     SnakeGame game = SnakeGame(gameSize, gameRandSeed);
+    std::cout << "Initialized game" << std::endl;
 
     // Init neural network stuff
-    constexpr int nTrials = 1000;
-    constexpr int itersPerTrial = 1;
-    float sigma = 1e-1f;
-    float learningRate = 1e-3f;
-    int appleTolerance = gameSize * gameSize;
-    const int hiddenSize = 32;
-
-    std::string savePath = "model.bin";
+    std::string savePath = currentTrainingRunPath + "/model.bin";
     SnakeModel model = SnakeModel(gameSize, hiddenSize);
+    SnakeModel originalModel = SnakeModel(gameSize, hiddenSize);
+    originalModel.copyWeights(model);
     SnakeModel modelCopy = SnakeModel(gameSize, hiddenSize);
     Matrix weight0Grad = Matrix(gameSize * gameSize, hiddenSize);
     Matrix weight1Grad = Matrix(gameSize * gameSize, hiddenSize);
@@ -72,6 +155,7 @@ int main()
     AdamOptimizer optim1 = AdamOptimizer(weight1Grad.numValues, learningRate);
     AdamOptimizer optim2 = AdamOptimizer(weight2Grad.numValues, learningRate);
     Matrix out = Matrix(1, 3);
+    std::cout << "Initialized model" << std::endl;
 
     float *scores = new float[nTrials];
 
@@ -100,9 +184,8 @@ int main()
                 std::cout << "Doing trial [" << i << "/" << nTrials << "]" << std::endl;
             }
 
-            modelCopy.copyWeights(model);
             // Add random noise to copy of model using sigma
-
+            modelCopy.copyWeights(model);
             modelCopy.addRand(randSeed, sigma);
 
             // Test model
@@ -153,6 +236,31 @@ int main()
         model.weight0.add(weight0Grad);
         model.weight1.add(weight1Grad);
         model.weight2.add(weight2Grad);
+
+        // Print grad norm
+        float norm = weight0Grad.normSquared() + weight1Grad.normSquared() + weight2Grad.normSquared();
+        norm = sqrt(norm);
+        std::cout << "Grad Norm: " << norm << std::endl;
+
+        // Print distance from starting weights
+        float dist = model.weight0.diffSquared(originalModel.weight0) + model.weight1.diffSquared(originalModel.weight1) + model.weight2.diffSquared(originalModel.weight2);
+        dist = sqrt(dist);
+        std::cout << "Current weights distance from starting weights: " << dist << std::endl;
+
+        // Test updated model
+        uint32_t testGameSeed = 42;
+        const float testScore = testModel(game, model, out, testGameSeed, itersPerTrial, appleTolerance);
+        std::cout << "Model Score: " << testScore << "\n\n";
+
+        // Log
+        std::ofstream logFile(currentTrainingRunPath + "/log.txt", std::ios::app); // Open in append mode
+        if (logFile.is_open())
+        {
+            logFile << testScore << " ";
+            logFile << norm << " ";
+            logFile << dist << "\n";
+            logFile.close();
+        }
 
         stepNum++;
 

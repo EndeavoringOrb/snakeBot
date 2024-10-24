@@ -1,0 +1,7 @@
+gameSize: 4
+nTrials: 30
+itersPerTrial: 10000
+sigma: 0.001
+learningRate: 0.01
+appleTolerance: 16
+hiddenSize: 32
