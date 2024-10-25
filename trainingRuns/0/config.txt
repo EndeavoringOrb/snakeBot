@@ -5,3 +5,4 @@ sigma: 0.001
 learningRate: 0.01
 appleTolerance: 16
 hiddenSize: 2
+optimizerType: adam

@@ -1,6 +1,51 @@
 #include "game.hpp"
 #include "customUtils.hpp"
 
+float testModel(const SnakeGame &game, SnakeModel &model, Matrix &out, uint32_t &randSeed, const int iters, const int appleTolerance)
+{
+    // Copy of game for test runs
+    SnakeGame newGame = SnakeGame(game.size, randSeed);
+    float totalScore = 0.0f;
+    float maxScore = 0.0f;
+
+    for (int i = 0; i < iters; i++)
+    {
+        // Reset game state
+        newGame.copyState(game);
+        newGame.randomizeApplePosition(randSeed);
+
+        // Play game to end
+        int numSteps = 0;
+        int lastAppleStep = 0;
+        bool gameOver = false;
+        while (!gameOver)
+        {
+            // Model forward
+            model.forward(newGame.board, newGame.applePosition, out);
+
+            // Take step
+            const int preStepScore = newGame.score;
+            gameOver = newGame.step(sampleAction(out, randSeed), randSeed);
+            if (newGame.score > preStepScore)
+            {
+                lastAppleStep = numSteps;
+            }
+            else if (numSteps - lastAppleStep > appleTolerance)
+            {
+                gameOver = true; // Have gone appleTolerance steps without getting an apple, so stop
+            }
+            numSteps++;
+        }
+
+        // Accumulate score (apples per step)
+        // totalScore += (float)newGame.score / (float)numSteps;
+        // maxScore = std::max(maxScore, (float)newGame.score);
+        totalScore += newGame.score;
+    }
+
+    return totalScore / (float)iters;
+}
+
 int main()
 {
     // Init window
@@ -25,17 +70,17 @@ int main()
     std::cout << "Enter training run #: ";
     std::cin >> trainingRun;
     SnakeModel model = SnakeModel(1, 1).loadFromFile("trainingRuns/" + std::to_string(trainingRun) + "/model.bin");
-    std::cout << "Loaded model" << std::endl;
-    model.weight0.print("weight0");
-    model.weight1.print("weight1");
-    model.weight2.print("weight2");
     Matrix out = Matrix(1, 3);
+    std::cout << "Loaded model with " << model.getNumParams() << " parameters" << std::endl;
 
     // Init game
     float tickSpeed = 0.2f;
     sf::Clock gameClock;
     uint32_t randSeed = 42;
     SnakeGame game = SnakeGame(model.size, randSeed);
+
+    float score = testModel(game, model, out, randSeed, 1000, game.size * game.size);
+    std::cout << "Model Avg. Score: " << score << std::endl;
 
     while (window.isOpen())
     {
@@ -57,9 +102,21 @@ int main()
         {
             // Model forward
             model.forward(game.board, game.applePosition, out);
-            out.print("out");
 
             // Update game
+            /*bool gameOver;
+            if (out.values[0] > out.values[1] && out.values[0] > out.values[2])
+            {
+                gameOver = game.step(SnakeActions::TURN_LEFT, randSeed);
+            }
+            else if (out.values[1] > out.values[0] && out.values[1] > out.values[2])
+            {
+                gameOver = game.step(SnakeActions::TURN_RIGHT, randSeed);
+            }
+            else
+            {
+                gameOver = game.step(SnakeActions::NO_TURN, randSeed);
+            }*/
             bool gameOver = game.step(sampleAction(out, randSeed), randSeed);
             if (gameOver)
             {

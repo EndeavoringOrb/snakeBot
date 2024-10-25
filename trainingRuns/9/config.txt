@@ -1,0 +1,8 @@
+gameSize: 4
+nTrials: 100
+itersPerTrial: 1000
+sigma: 0.1
+learningRate: 0.01
+appleTolerance: 16
+hiddenSize: 32
+optimizerType: adam

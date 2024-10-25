@@ -61,6 +61,7 @@ float testModel(const SnakeGame &game, SnakeModel &model, Matrix &out, uint32_t 
     {
         // Reset game state
         newGame.copyState(game);
+        newGame.randomizeApplePosition(randSeed);
 
         // Play game to end
         int numSteps = 0;
@@ -97,14 +98,17 @@ float testModel(const SnakeGame &game, SnakeModel &model, Matrix &out, uint32_t 
 int main()
 {
     // Settings
-    constexpr int gameSize = 16;
+    constexpr int gameSize = 4;
 
-    constexpr int nTrials = 30;
-    constexpr int itersPerTrial = 10000;
-    float sigma = 1e-3f;
+    constexpr int nTrials = 100;
+    constexpr int itersPerTrial = 100;
+    float sigma = 1e-1f;
     float learningRate = 1e-2f;
     int appleTolerance = gameSize * gameSize;
     const int hiddenSize = 32;
+    std::string optimizerType = "sgd";
+
+    int logInterval = 100;
 
     // Get training run ID
     int currentTrainingRun = getNextTrainingRun("trainingRuns");
@@ -131,6 +135,7 @@ int main()
         file << "learningRate: " << learningRate << "\n";
         file << "appleTolerance: " << appleTolerance << "\n";
         file << "hiddenSize: " << hiddenSize << "\n";
+        file << "optimizerType: " << optimizerType << "\n";
         file.close();
     }
 
@@ -148,12 +153,8 @@ int main()
     SnakeModel originalModel = SnakeModel(gameSize, hiddenSize);
     originalModel.copyWeights(model);
     SnakeModel modelCopy = SnakeModel(gameSize, hiddenSize);
-    Matrix weight0Grad = Matrix(gameSize * gameSize, hiddenSize);
-    Matrix weight1Grad = Matrix(gameSize * gameSize, hiddenSize);
-    Matrix weight2Grad = Matrix(hiddenSize, 3);
-    AdamOptimizer optim0 = AdamOptimizer(weight0Grad.numValues, learningRate);
-    AdamOptimizer optim1 = AdamOptimizer(weight1Grad.numValues, learningRate);
-    AdamOptimizer optim2 = AdamOptimizer(weight2Grad.numValues, learningRate);
+    Matrix grad = Matrix(1, model.getNumParams());
+    AdamOptimizer adamOptim = AdamOptimizer(model.getNumParams(), learningRate);
     Matrix out = Matrix(1, 3);
     std::cout << "Initialized model" << std::endl;
 
@@ -161,16 +162,13 @@ int main()
 
     // Init tracker stuff
     int stepNum = 0;
-    int logInterval = 1000;
 
     std::cout << "Model has " << model.getNumParams() << " parameters" << std::endl;
 
     while (true)
     {
         // Zero gradient
-        weight0Grad.zeros();
-        weight1Grad.zeros();
-        weight2Grad.zeros();
+        grad.zeros();
 
         float meanScore = 0.0f;
         uint32_t noiseSeed = randSeed;
@@ -216,30 +214,37 @@ int main()
             modelCopy.weight0.mul(scoreVal);
             modelCopy.weight1.mul(scoreVal);
             modelCopy.weight2.mul(scoreVal);
-            weight0Grad.add(modelCopy.weight0);
-            weight1Grad.add(modelCopy.weight1);
-            weight2Grad.add(modelCopy.weight2);
+            int gradStart = 0;
+            grad.addOther(modelCopy.weight0, gradStart, modelCopy.weight0.numValues);
+            gradStart += modelCopy.weight0.numValues;
+            grad.addOther(modelCopy.weight1, gradStart, gradStart + modelCopy.weight1.numValues);
+            gradStart += modelCopy.weight1.numValues;
+            grad.addOther(modelCopy.weight2, gradStart, gradStart + modelCopy.weight2.numValues);
         }
 
-        // Finalize gradient
-        float mulVal = 1.0f / (nTrials * sigma);
-        weight0Grad.mul(mulVal);
-        weight1Grad.mul(mulVal);
-        weight2Grad.mul(mulVal);
-
-        // Adam
-        optim0.getGrads(weight0Grad);
-        optim1.getGrads(weight1Grad);
-        optim2.getGrads(weight2Grad);
+        // Finalize gradient with optimizer
+        if (optimizerType == "adam")
+        {
+            float mulVal = 1.0f / (nTrials * sigma);
+            grad.mul(mulVal);
+            adamOptim.getGrads(grad);
+        }
+        else
+        {
+            float mulVal = learningRate / (nTrials * sigma);
+            grad.mul(mulVal);
+        }
 
         // Update model using gradient
-        model.weight0.add(weight0Grad);
-        model.weight1.add(weight1Grad);
-        model.weight2.add(weight2Grad);
+        int gradStart = 0;
+        model.weight0.otherAdd(grad, gradStart, gradStart + model.weight0.numValues);
+        gradStart += modelCopy.weight0.numValues;
+        model.weight1.otherAdd(grad, gradStart, gradStart + modelCopy.weight1.numValues);
+        gradStart += modelCopy.weight1.numValues;
+        model.weight2.otherAdd(grad, gradStart, gradStart + modelCopy.weight2.numValues);
 
         // Print grad norm
-        float norm = weight0Grad.normSquared() + weight1Grad.normSquared() + weight2Grad.normSquared();
-        norm = sqrt(norm);
+        float norm = sqrt(grad.normSquared());
         std::cout << "Grad Norm: " << norm << std::endl;
 
         // Print distance from starting weights

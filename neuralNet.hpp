@@ -47,6 +47,22 @@ struct Matrix
         }
     }
 
+    void addOther(const Matrix &other, int start, int stop)
+    {
+        for (int i = start; i < stop; i++)
+        {
+            values[i] += other.values[i - start];
+        }
+    }
+
+    void otherAdd(const Matrix &other, int start, int stop)
+    {
+        for (int i = start; i < stop; i++)
+        {
+            values[i - start] += other.values[i];
+        }
+    }
+
     void sub(const Matrix &other)
     {
         for (int i = 0; i < numValues; i++)
@@ -265,10 +281,10 @@ struct SnakeModel
         }
         // hidden.print("hidden");
 
-        // hidden = activation(hidden + weight1[applePos])
+        // hidden = activation(hidden * weight1[applePos])
         for (int j = 0; j < hiddenSize; j++)
         {
-            const float x = hidden.values[j] + weight1.values[applePos * hiddenSize + j];
+            const float x = hidden.values[j] * weight1.values[applePos * hiddenSize + j];
 
             if (x < -1.0f)
             {
